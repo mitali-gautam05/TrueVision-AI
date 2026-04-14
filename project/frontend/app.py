@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from PIL import Image
 
-API_URL = "http://127.0.0.1:8000/predict"
+API_URL = "https://truevision-ai-1-2qy1.onrender.com/predict"
 
 st.set_page_config(page_title="Handwriting Detection")
 
