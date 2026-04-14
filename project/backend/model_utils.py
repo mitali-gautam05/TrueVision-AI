@@ -1,14 +1,20 @@
 import tensorflow as tf
 import numpy as np
+import os
 
 IMG_SIZE = (224, 224)
 
+# Get absolute path (IMPORTANT for deployment)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load both models (cached once in Streamlit)
-@tf.keras.utils.register_keras_serializable()
+MOBILENET_PATH = os.path.join(BASE_DIR, "models", "mobilenet_model.keras")
+RESNET_PATH = os.path.join(BASE_DIR, "models", "resnet_model.keras")
+
+
+# Load both models
 def load_models():
-    mobilenet = tf.keras.models.load_model("models/mobilenet_model.keras")
-    resnet = tf.keras.models.load_model("models/resnet_model.keras")
+    mobilenet = tf.keras.models.load_model(MOBILENET_PATH)
+    resnet = tf.keras.models.load_model(RESNET_PATH)
     return mobilenet, resnet
 
 
@@ -30,9 +36,6 @@ def preprocess_resnet(img):
 
 # Final prediction (ENSEMBLE)
 def predict_image(mobilenet, resnet, img):
-    """
-    img: numpy array of shape (H, W, 3), RGB
-    """
     img = img.astype(np.float32)
 
     # MobileNet prediction
@@ -46,7 +49,6 @@ def predict_image(mobilenet, resnet, img):
     # Ensemble (average)
     final_pred = (pred_m + pred_r) / 2
 
-    # Threshold (same as your logic)
     threshold = 0.35
 
     label = "FAKE ❌" if final_pred > threshold else "REAL ✅"
