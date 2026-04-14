@@ -4,17 +4,18 @@ import os
 
 IMG_SIZE = (224, 224)
 
-# Get absolute path (IMPORTANT for deployment)
+# ✅ Base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# ✅ Model paths
 MOBILENET_PATH = os.path.join(BASE_DIR, "models", "mobilenet_model.keras")
 RESNET_PATH = os.path.join(BASE_DIR, "models", "resnet_model.keras")
 
 
-# Load both models
+# ✅ Load models (ONLY here)
 def load_models():
-    mobilenet = tf.keras.models.load_model(MOBILENET_PATH)
-    resnet = tf.keras.models.load_model(RESNET_PATH)
+    mobilenet = tf.keras.models.load_model(MOBILENET_PATH, compile=False)
+    resnet = tf.keras.models.load_model(RESNET_PATH, compile=False)
     return mobilenet, resnet
 
 
@@ -34,19 +35,16 @@ def preprocess_resnet(img):
     return img
 
 
-# Final prediction (ENSEMBLE)
+# Prediction
 def predict_image(mobilenet, resnet, img):
     img = img.astype(np.float32)
 
-    # MobileNet prediction
     img_m = preprocess_mobilenet(img)
     pred_m = mobilenet.predict(tf.expand_dims(img_m, 0), verbose=0)[0][0]
 
-    # ResNet prediction
     img_r = preprocess_resnet(img)
     pred_r = resnet.predict(tf.expand_dims(img_r, 0), verbose=0)[0][0]
 
-    # Ensemble (average)
     final_pred = (pred_m + pred_r) / 2
 
     threshold = 0.35
