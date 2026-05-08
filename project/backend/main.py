@@ -203,19 +203,31 @@ async def predict(file: UploadFile = File(...)):
             content={"error": str(e)}
         )
 
-@app.get("/debug")
-def debug():
-    import os
-    files_in_base = os.listdir(BASE_DIR)
-    models_exist  = os.path.exists(MODEL_DIR)
-    files_in_models = os.listdir(MODEL_DIR) if models_exist else []
+@app.get("/debug-models")
+def debug_models():
+    import traceback
+    results = {}
     
-    return {
-        "BASE_DIR":          BASE_DIR,
-        "MODEL_DIR":         MODEL_DIR,
-        "models_dir_exists": models_exist,
-        "files_in_models":   files_in_models,
-        "files_in_base":     files_in_base,
-        "mobilenet_loaded":  mobilenet_model is not None,
-        "resnet_loaded":     resnet_model    is not None,
-    }
+    # Test MobileNet
+    try:
+        import tensorflow as tf
+        import os
+        path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
+        m = tf.keras.models.load_model(path)
+        results["mobilenet"] = "loaded OK"
+        del m
+    except Exception as e:
+        results["mobilenet_error"] = str(e)
+        results["mobilenet_trace"] = traceback.format_exc()
+
+    # Test ResNet
+    try:
+        path = os.path.join(MODEL_DIR, "resnet_model.h5")
+        r = tf.keras.models.load_model(path)
+        results["resnet"] = "loaded OK"
+        del r
+    except Exception as e:
+        results["resnet_error"] = str(e)
+        results["resnet_trace"] = traceback.format_exc()
+
+    return results
