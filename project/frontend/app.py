@@ -34,8 +34,18 @@ def get_base64(file_path):
         return ""
 
 # =====================================================
+# LOAD BACKGROUND SAFE (DEPLOYMENT FIX)
+# =====================================================
+bg_path = "assets/bg.jpg"
+
+if os.path.exists(bg_path):
+    bg = get_base64(bg_path)
+else:
+    bg = ""
+# =====================================================
 # PREMIUM CSS
 # =====================================================
+bg_css = f"url('data:image/jpg;base64,{bg}')" if bg else "none"
 st.markdown(f"""
 <style>
 
@@ -85,7 +95,7 @@ footer {{
 .stApp {{
     background:
     linear-gradient(rgba(4,8,20,0.78), rgba(4,8,20,0.84)),
-    url("data:image/jpg;base64,{bg}");
+    {bg_css};
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
