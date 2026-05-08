@@ -24,7 +24,7 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =====================================================
-# LOAD BACKGROUND
+# ASSET HELPERS
 # =====================================================
 def get_base64(file_path):
     try:
@@ -33,15 +33,17 @@ def get_base64(file_path):
     except Exception:
         return ""
 
+def safe_image(path, **kwargs):
+    """Render st.image only when the file actually exists — no crash if missing."""
+    if os.path.exists(path):
+        st.image(path, **kwargs)
+
 # =====================================================
-# LOAD BACKGROUND SAFE (DEPLOYMENT FIX)
+# BACKGROUND
 # =====================================================
 bg_path = "assets/bg.jpg"
+bg = get_base64(bg_path) if os.path.exists(bg_path) else ""
 
-if os.path.exists(bg_path):
-    bg = get_base64(bg_path)
-else:
-    bg = ""
 # =====================================================
 # PREMIUM CSS
 # =====================================================
@@ -184,7 +186,6 @@ section[data-testid="stSidebar"] * {{
 FILE UPLOADER DARK FIX
 ===================================================== */
 
-/* Outer uploader */
 [data-testid="stFileUploader"] {{
     background: rgba(255,255,255,0.04) !important;
     border-radius: 20px !important;
@@ -192,7 +193,6 @@ FILE UPLOADER DARK FIX
     border: 1px solid rgba(255,255,255,0.08) !important;
 }}
 
-/* Inner drag box */
 [data-testid="stFileUploaderDropzone"] {{
     background: rgba(15,23,42,0.92) !important;
     border: 2px dashed #38bdf8 !important;
@@ -200,18 +200,15 @@ FILE UPLOADER DARK FIX
     padding: 35px !important;
 }}
 
-/* Hover effect */
 [data-testid="stFileUploaderDropzone"]:hover {{
     background: rgba(30,41,59,0.95) !important;
     border-color: #22d3ee !important;
 }}
 
-/* Text inside uploader */
 [data-testid="stFileUploaderDropzone"] * {{
     color: white !important;
 }}
 
-/* Browse files button */
 [data-testid="stFileUploaderDropzone"] button {{
     background: linear-gradient(90deg,#06b6d4,#2563eb) !important;
     color: white !important;
@@ -224,7 +221,6 @@ FILE UPLOADER DARK FIX
     color: white !important;
 }}
 
-/* Uploaded file selected row */
 [data-testid="stFileUploaderFile"] {{
     background: rgba(255,255,255,0.06) !important;
     border-radius: 12px !important;
@@ -259,7 +255,7 @@ API_URL = "https://truevision-ai-6.onrender.com/predict"
 # =====================================================
 # SIDEBAR
 # =====================================================
-st.sidebar.image("assets/logo.png", width=150)
+safe_image("assets/logo.png", width=150)   # crash-safe: skipped if file missing
 st.sidebar.markdown("## TrueVision AI")
 st.sidebar.caption("Forgery Detection Platform")
 
@@ -284,7 +280,7 @@ if page == "🏠 Home":
     col1, col2 = st.columns([1,5])
 
     with col1:
-        st.image("assets/logo.png", width=120)
+        safe_image("assets/logo.png", width=120)   # crash-safe
 
     with col2:
         st.markdown("""
@@ -360,26 +356,35 @@ elif page == "🔍 Detection":
                     )
                 }
 
-                response = requests.post(API_URL, files=files)
-                result = response.json()
+                try:
+                    response = requests.post(API_URL, files=files, timeout=60)
+                    response.raise_for_status()
+                    result = response.json()
+                except requests.exceptions.Timeout:
+                    st.error("Request timed out. The backend may be cold-starting — please try again in 30 seconds.")
+                    st.stop()
+                except requests.exceptions.ConnectionError:
+                    st.error("Could not connect to the backend. Please check that the API server is running.")
+                    st.stop()
+                except Exception as e:
+                    st.error(f"Unexpected error: {e}")
+                    st.stop()
 
                 if "error" in result:
                     st.error(result["error"])
 
                 else:
-                    label = result["label"]
+                    label      = result["label"]
                     confidence = result["confidence"]
-                    mobilenet = result["mobilenet"]
-                    resnet = result["resnet"]
+                    mobilenet  = result["mobilenet"]
+                    resnet     = result["resnet"]
 
-                    a,b,c = st.columns(3)
+                    a, b, c = st.columns(3)
 
                     with a:
                         st.metric("Prediction", label)
-
                     with b:
                         st.metric("Confidence", f"{confidence:.3f}")
-
                     with c:
                         st.metric("Status", "Completed")
 
@@ -389,29 +394,25 @@ elif page == "🔍 Detection":
 
                     with col1:
                         st.metric("MobileNet", f"{mobilenet:.3f}")
-
                     with col2:
                         st.metric("ResNet", f"{resnet:.3f}")
 
                     fig, ax = plt.subplots(figsize=(8,4))
-                    bars = ax.bar(
-                        ["MobileNet","ResNet"],
-                        [mobilenet,resnet]
-                    )
-
-                    ax.set_ylim(0,1)
+                    bars = ax.bar(["MobileNet","ResNet"], [mobilenet, resnet])
+                    ax.set_ylim(0, 1)
                     ax.set_title("Model Confidence Comparison")
 
                     for bar in bars:
                         h = bar.get_height()
                         ax.text(
-                            bar.get_x()+bar.get_width()/2,
-                            h+0.02,
+                            bar.get_x() + bar.get_width() / 2,
+                            h + 0.02,
                             f"{h:.2f}",
                             ha="center"
                         )
 
                     st.pyplot(fig)
+                    plt.close(fig)   # free memory after rendering
 
                     # ==========================================
                     # AFTER GRAPH FEATURES
@@ -427,10 +428,8 @@ elif page == "🔍 Detection":
                     st.markdown("## Confidence Progress")
                     st.progress(float(confidence))
 
-                    # st.markdown("## Model Agreement")
-
                     mob_label = "FAKE" if mobilenet > 0.35 else "REAL"
-                    res_label = "FAKE" if resnet > 0.35 else "REAL"
+                    res_label = "FAKE" if resnet    > 0.35 else "REAL"
 
                     if mob_label == res_label:
                         st.success(f"Both Models Agree : {mob_label}")
@@ -438,10 +437,10 @@ elif page == "🔍 Detection":
                         st.warning("Models Disagree")
 
                     st.session_state.history.append({
-                        "Time": datetime.now().strftime("%H:%M:%S"),
-                        "File": uploaded_file.name,
-                        "Result": label,
-                        "Confidence": round(confidence,3)
+                        "Time":       datetime.now().strftime("%H:%M:%S"),
+                        "File":       uploaded_file.name,
+                        "Result":     label,
+                        "Confidence": round(confidence, 3)
                     })
 
                     report = f"""
