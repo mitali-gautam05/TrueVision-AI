@@ -27,10 +27,11 @@ if "history" not in st.session_state:
 # LOAD BACKGROUND
 # =====================================================
 def get_base64(file_path):
-    with open(file_path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-bg = get_base64("assets/bg.jpg")
+    try:
+        with open(file_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
 
 # =====================================================
 # PREMIUM CSS
@@ -243,7 +244,7 @@ hr {{
 # =====================================================
 # API
 # =====================================================
-API_URL = "http://127.0.0.1:8000/predict"
+API_URL = "https://truevision-ai-6.onrender.com/predict"
 
 # =====================================================
 # SIDEBAR
