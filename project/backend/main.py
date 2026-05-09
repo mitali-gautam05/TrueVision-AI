@@ -42,10 +42,9 @@ BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 
 # =====================================================
-# LIMIT TF MEMORY (CRITICAL FOR RENDER FREE TIER)
-# Prevents OOM kill by capping GPU/CPU memory growth
+# SUPPRESS TF LOGS + MEMORY GROWTH
 # =====================================================
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"   # suppress TF noise
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 gpus = tf.config.list_physical_devices("GPU")
 if gpus:
@@ -70,7 +69,7 @@ def load_models():
     mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
     resnet_path    = os.path.join(MODEL_DIR, "resnet_model.h5")
 
-    # --- check files exist before loading ---
+    # --- check files exist ---
     if not os.path.exists(mobilenet_path):
         log.error(f"MobileNet model NOT found at: {mobilenet_path}")
         return
@@ -78,23 +77,31 @@ def load_models():
         log.error(f"ResNet model NOT found at: {resnet_path}")
         return
 
+    # --- load MobileNet ---
     try:
         log.info("Loading MobileNet model...")
-        mobilenet_model = tf.keras.models.load_model(mobilenet_path)
+        mobilenet_model = tf.keras.models.load_model(
+            mobilenet_path,
+            compile=False   # ← fixes InputLayer deserialization mismatch
+        )
         log.info("MobileNet loaded ✅")
     except Exception as e:
         log.error(f"MobileNet load FAILED: {e}")
         traceback.print_exc()
 
+    # --- load ResNet ---
     try:
         log.info("Loading ResNet model...")
-        resnet_model = tf.keras.models.load_model(resnet_path)
+        resnet_model = tf.keras.models.load_model(
+            resnet_path,
+            compile=False   # ← fixes InputLayer deserialization mismatch
+        )
         log.info("ResNet loaded ✅")
     except Exception as e:
         log.error(f"ResNet load FAILED: {e}")
         traceback.print_exc()
 
-# Load at startup
+# Run at startup
 load_models()
 
 # =====================================================
@@ -110,20 +117,41 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
     return arr
 
 # =====================================================
-# HOME / HEALTH CHECK
+# HOME
 # =====================================================
 @app.get("/")
 def home():
     return {
-        "message":        "TrueVision AI Backend Running",
+        "message":         "TrueVision AI Backend Running",
         "mobilenet_ready": mobilenet_model is not None,
         "resnet_ready":    resnet_model    is not None,
     }
 
+# =====================================================
+# HEALTH (use with UptimeRobot to prevent cold starts)
+# =====================================================
 @app.get("/health")
 def health():
     status = "ok" if (mobilenet_model and resnet_model) else "degraded"
     return {"status": status}
+
+# =====================================================
+# DEBUG — visit /debug in browser to verify paths
+# =====================================================
+@app.get("/debug")
+def debug():
+    models_exist      = os.path.exists(MODEL_DIR)
+    files_in_models   = os.listdir(MODEL_DIR) if models_exist else []
+    files_in_base     = os.listdir(BASE_DIR)
+    return {
+        "BASE_DIR":          BASE_DIR,
+        "MODEL_DIR":         MODEL_DIR,
+        "models_dir_exists": models_exist,
+        "files_in_models":   files_in_models,
+        "files_in_base":     files_in_base,
+        "mobilenet_loaded":  mobilenet_model is not None,
+        "resnet_loaded":     resnet_model    is not None,
+    }
 
 # =====================================================
 # PREDICT
@@ -136,16 +164,11 @@ async def predict(file: UploadFile = File(...)):
         log.error("Predict called but models are not loaded")
         return JSONResponse(
             status_code=500,
-            content={
-                "error": (
-                    "Models are not loaded. "
-                    "Check Render logs for MODEL LOADING ERROR."
-                )
-            }
+            content={"error": "Models not loaded. Check Render logs for details."}
         )
 
     try:
-        # --- read & validate file ---
+        # --- read & validate ---
         image_bytes = await file.read()
 
         if len(image_bytes) == 0:
@@ -197,37 +220,8 @@ async def predict(file: UploadFile = File(...)):
 
     except Exception as e:
         log.error(f"Prediction error: {e}")
-        traceback.print_exc()   # full traceback visible in Render logs
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={"error": str(e)}
         )
-
-@app.get("/debug-models")
-def debug_models():
-    import traceback
-    results = {}
-    
-    # Test MobileNet
-    try:
-        import tensorflow as tf
-        import os
-        path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
-        m = tf.keras.models.load_model(path)
-        results["mobilenet"] = "loaded OK"
-        del m
-    except Exception as e:
-        results["mobilenet_error"] = str(e)
-        results["mobilenet_trace"] = traceback.format_exc()
-
-    # Test ResNet
-    try:
-        path = os.path.join(MODEL_DIR, "resnet_model.h5")
-        r = tf.keras.models.load_model(path)
-        results["resnet"] = "loaded OK"
-        del r
-    except Exception as e:
-        results["resnet_error"] = str(e)
-        results["resnet_trace"] = traceback.format_exc()
-
-    return results
