@@ -2,11 +2,19 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+# ── Force Keras 2 (legacy) mode ──────────────────────────────────────────────
+# MUST be set before importing tensorflow.
+# Fixes: "Unrecognized keyword arguments: ['batch_shape', 'optional']"
+# which happens when .h5 models saved with Keras 2 are loaded under Keras 3
+# (Keras 3 ships with TensorFlow 2.16+).
+import os
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+# ─────────────────────────────────────────────────────────────────────────────
+
 import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
-import os
 import traceback
 import logging
 
@@ -69,7 +77,6 @@ def load_models():
     mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
     resnet_path    = os.path.join(MODEL_DIR, "resnet_model.h5")
 
-    # --- check files exist ---
     if not os.path.exists(mobilenet_path):
         log.error(f"MobileNet model NOT found at: {mobilenet_path}")
         return
@@ -77,31 +84,28 @@ def load_models():
         log.error(f"ResNet model NOT found at: {resnet_path}")
         return
 
-    # --- load MobileNet ---
     try:
         log.info("Loading MobileNet model...")
         mobilenet_model = tf.keras.models.load_model(
             mobilenet_path,
-            compile=False   # ← fixes InputLayer deserialization mismatch
+            compile=False
         )
         log.info("MobileNet loaded ✅")
     except Exception as e:
         log.error(f"MobileNet load FAILED: {e}")
         traceback.print_exc()
 
-    # --- load ResNet ---
     try:
         log.info("Loading ResNet model...")
         resnet_model = tf.keras.models.load_model(
             resnet_path,
-            compile=False   # ← fixes InputLayer deserialization mismatch
+            compile=False
         )
         log.info("ResNet loaded ✅")
     except Exception as e:
         log.error(f"ResNet load FAILED: {e}")
         traceback.print_exc()
 
-# Run at startup
 load_models()
 
 # =====================================================
@@ -128,7 +132,7 @@ def home():
     }
 
 # =====================================================
-# HEALTH (use with UptimeRobot to prevent cold starts)
+# HEALTH  (ping this with UptimeRobot to avoid cold starts)
 # =====================================================
 @app.get("/health")
 def health():
@@ -136,13 +140,13 @@ def health():
     return {"status": status}
 
 # =====================================================
-# DEBUG — visit /debug in browser to verify paths
+# DEBUG  (visit in browser to verify file paths)
 # =====================================================
 @app.get("/debug")
 def debug():
-    models_exist      = os.path.exists(MODEL_DIR)
-    files_in_models   = os.listdir(MODEL_DIR) if models_exist else []
-    files_in_base     = os.listdir(BASE_DIR)
+    models_exist    = os.path.exists(MODEL_DIR)
+    files_in_models = os.listdir(MODEL_DIR) if models_exist else []
+    files_in_base   = os.listdir(BASE_DIR)
     return {
         "BASE_DIR":          BASE_DIR,
         "MODEL_DIR":         MODEL_DIR,
@@ -151,6 +155,7 @@ def debug():
         "files_in_base":     files_in_base,
         "mobilenet_loaded":  mobilenet_model is not None,
         "resnet_loaded":     resnet_model    is not None,
+        "keras_backend":     os.environ.get("TF_USE_LEGACY_KERAS", "not set"),
     }
 
 # =====================================================
@@ -159,7 +164,6 @@ def debug():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
-    # --- guard: models must be loaded ---
     if mobilenet_model is None or resnet_model is None:
         log.error("Predict called but models are not loaded")
         return JSONResponse(
@@ -168,7 +172,6 @@ async def predict(file: UploadFile = File(...)):
         )
 
     try:
-        # --- read & validate ---
         image_bytes = await file.read()
 
         if len(image_bytes) == 0:
@@ -177,7 +180,6 @@ async def predict(file: UploadFile = File(...)):
                 content={"error": "Uploaded file is empty."}
             )
 
-        # --- preprocess ---
         try:
             processed_image = preprocess_image(image_bytes)
         except Exception as e:
@@ -187,7 +189,6 @@ async def predict(file: UploadFile = File(...)):
                 content={"error": f"Invalid image file: {e}"}
             )
 
-        # --- inference ---
         log.info(f"Running inference on: {file.filename}")
 
         mobilenet_pred = float(
@@ -199,7 +200,6 @@ async def predict(file: UploadFile = File(...)):
 
         log.info(f"MobileNet: {mobilenet_pred:.3f} | ResNet: {resnet_pred:.3f}")
 
-        # --- ensemble ---
         confidence = (mobilenet_pred + resnet_pred) / 2
         threshold  = 0.35
 
