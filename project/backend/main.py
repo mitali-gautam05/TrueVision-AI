@@ -64,8 +64,8 @@ resnet_model    = None
 def load_models():
     global mobilenet_model, resnet_model
 
-    mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
-    resnet_path    = os.path.join(MODEL_DIR, "resnet_model.h5")
+    mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model_v2.h5")
+    resnet_path    = os.path.join(MODEL_DIR, "resnet_model_v2.h5")
 
     if not os.path.exists(mobilenet_path):
         log.error(f"MobileNet NOT found: {mobilenet_path}")
