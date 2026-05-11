@@ -2,7 +2,6 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# Keras 3 models — do NOT set TF_USE_LEGACY_KERAS
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -10,6 +9,7 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 import io
+import gc
 import traceback
 import logging
 
@@ -21,6 +21,12 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 log = logging.getLogger(__name__)
+
+# =====================================================
+# LIMIT THREADS — critical for Render free tier RAM
+# =====================================================
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
 
 # =====================================================
 # FASTAPI APP
@@ -42,7 +48,7 @@ BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 
 # =====================================================
-# MEMORY GROWTH
+# GPU MEMORY GROWTH
 # =====================================================
 gpus = tf.config.list_physical_devices("GPU")
 if gpus:
@@ -64,8 +70,8 @@ resnet_model    = None
 def load_models():
     global mobilenet_model, resnet_model
 
-    mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model_v2.h5")
-    resnet_path    = os.path.join(MODEL_DIR, "resnet_model_v2.h5")
+    mobilenet_path = os.path.join(MODEL_DIR, "mobilenet_model.h5")
+    resnet_path    = os.path.join(MODEL_DIR, "resnet_model.h5")
 
     if not os.path.exists(mobilenet_path):
         log.error(f"MobileNet NOT found: {mobilenet_path}")
@@ -96,6 +102,10 @@ def load_models():
         log.error(f"ResNet FAILED: {e}")
         traceback.print_exc()
 
+    # force garbage collection after loading both models
+    gc.collect()
+    log.info("Models loaded — memory cleaned up")
+
 load_models()
 
 # =====================================================
@@ -110,7 +120,7 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
     return np.expand_dims(arr, axis=0)
 
 # =====================================================
-# ROUTES
+# HOME
 # =====================================================
 @app.get("/")
 def home():
@@ -122,11 +132,17 @@ def home():
         "tf_version":      tf.__version__,
     }
 
+# =====================================================
+# HEALTH  (ping with UptimeRobot to prevent cold starts)
+# =====================================================
 @app.get("/health")
 def health():
     status = "ok" if (mobilenet_model and resnet_model) else "degraded"
     return {"status": status}
 
+# =====================================================
+# DEBUG
+# =====================================================
 @app.get("/debug")
 def debug():
     models_exist    = os.path.exists(MODEL_DIR)
@@ -142,6 +158,9 @@ def debug():
         "tf_version":        tf.__version__,
     }
 
+# =====================================================
+# PREDICT
+# =====================================================
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
@@ -152,7 +171,10 @@ async def predict(file: UploadFile = File(...)):
             content={"error": "Models not loaded. Check Render logs."}
         )
 
+    processed_image = None
+
     try:
+        # --- read & validate ---
         image_bytes = await file.read()
 
         if len(image_bytes) == 0:
@@ -161,9 +183,11 @@ async def predict(file: UploadFile = File(...)):
                 content={"error": "Uploaded file is empty."}
             )
 
+        # --- preprocess ---
         try:
             processed_image = preprocess_image(image_bytes)
         except Exception as e:
+            log.error(f"Preprocessing failed: {e}")
             return JSONResponse(
                 status_code=400,
                 content={"error": f"Invalid image: {e}"}
@@ -171,6 +195,7 @@ async def predict(file: UploadFile = File(...)):
 
         log.info(f"Running inference: {file.filename}")
 
+        # --- inference ---
         mobilenet_pred = float(
             mobilenet_model.predict(processed_image, verbose=0)[0][0]
         )
@@ -180,6 +205,7 @@ async def predict(file: UploadFile = File(...)):
 
         log.info(f"MobileNet: {mobilenet_pred:.3f} | ResNet: {resnet_pred:.3f}")
 
+        # --- ensemble ---
         confidence = (mobilenet_pred + resnet_pred) / 2
         label = (
             "FAKE Handwriting Detected"
@@ -203,3 +229,10 @@ async def predict(file: UploadFile = File(...)):
             status_code=500,
             content={"error": str(e)}
         )
+
+    finally:
+        # --- always free memory after every request ---
+        if processed_image is not None:
+            del processed_image
+        gc.collect()
+        log.info("Memory cleaned after request")
