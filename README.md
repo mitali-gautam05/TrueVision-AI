@@ -197,4 +197,4 @@ UI will open at `http://localhost:8501`
 ---
 
 
-*Contributions, suggestions, and feedback are welcome — feel free to open an issue or submit a pull request.*
+
