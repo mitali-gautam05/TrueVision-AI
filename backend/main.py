@@ -235,9 +235,11 @@ async def predict(file: UploadFile = File(...)):
         mobilenet_pred = float(
             mobilenet_model.predict(processed_image, verbose=0)[0][0]
         )
+        gc.collect()
         resnet_pred = float(
             resnet_model.predict(processed_image, verbose=0)[0][0]
         )
+        gc.collect()
 
         log.info(f"MobileNet: {mobilenet_pred:.3f} | ResNet: {resnet_pred:.3f}")
 

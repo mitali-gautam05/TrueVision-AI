@@ -275,40 +275,31 @@ if not st.session_state.warmed_up:
 # RETRY HELPER FOR /predict
 # =====================================================
 def call_backend_with_retry(files, max_retries=4, timeout=90, wait_between=8):
-    """
-    Handles Render cold starts and the backend's 'warming_up' response
-    by retrying instead of failing immediately.
-    """
     for attempt in range(max_retries):
         try:
             response = requests.post(API_URL, files=files, timeout=timeout)
 
-            # Backend explicitly says models are still loading
-            if response.status_code == 503:
+            if response.status_code in (502, 503, 504):
                 if attempt < max_retries - 1:
-                    st.info(f"Backend abhi warm ho raha hai... retry {attempt + 1}/{max_retries}")
+                    st.info(f"Backend is restarting, retry {attempt + 1}/{max_retries}")
                     time.sleep(wait_between)
                     continue
                 else:
-                    return {"error": "Backend abhi bhi ready nahi hua. Thodi der baad try karo."}
+                    return {"error": "Backend error is happening again and again , check logs"}
 
             response.raise_for_status()
             return response.json()
 
         except requests.exceptions.Timeout:
             if attempt < max_retries - 1:
-                st.info(f"Request timeout, retry ho raha hai... {attempt + 1}/{max_retries}")
                 time.sleep(wait_between)
             else:
-                return {"error": "Request timed out repeatedly. Backend cold-starting ho sakta hai — 1 min baad try karo."}
-
+                return {"error": "Request timed out repeatedly."}
         except requests.exceptions.ConnectionError:
-            return {"error": "Could not connect to the backend. Please check that the API server is running."}
-
+            return {"error": "Could not connect to backend."}
         except Exception as e:
             return {"error": f"Unexpected error: {e}"}
-
-    return {"error": "Backend se response nahi mila."}
+    return {"error": "No response from backend."}
 
 # =====================================================
 # SIDEBAR
