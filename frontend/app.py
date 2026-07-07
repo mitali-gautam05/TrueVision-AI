@@ -274,18 +274,44 @@ if not st.session_state.warmed_up:
 # =====================================================
 # RETRY HELPER FOR /predict
 # =====================================================
-def call_backend_with_retry(files, max_retries=4, timeout=90, wait_between=8):
+def wait_for_models_ready(max_wait=150, poll_interval=5):
+    """Poll the root endpoint until both models report ready, or give up after max_wait seconds."""
+    waited = 0
+    status_box = st.empty()
+    while waited < max_wait:
+        try:
+            r = requests.get(ROOT_URL, timeout=15)
+            data = r.json()
+            if data.get("mobilenet_ready") and data.get("resnet_ready"):
+                status_box.empty()
+                return True
+            if data.get("models_error"):
+                status_box.error(f"Backend model load failed: {data['models_error']}")
+                return False
+            status_box.info(f"Backend is warming up (loading AI models)... {waited}s")
+        except Exception:
+            status_box.info(f"Waiting for backend to respond... {waited}s")
+        time.sleep(poll_interval)
+        waited += poll_interval
+    status_box.error("Backend took too long to warm up.")
+    return False
+
+
+def call_backend_with_retry(files, max_retries=3, timeout=90, wait_between=6):
+    # Make sure models are actually loaded before hitting /predict at all
+    if not wait_for_models_ready():
+        return {"error": "Backend models never became ready in time."}
+
     for attempt in range(max_retries):
         try:
             response = requests.post(API_URL, files=files, timeout=timeout)
 
             if response.status_code in (502, 503, 504):
                 if attempt < max_retries - 1:
-                    st.info(f"Backend is restarting, retry {attempt + 1}/{max_retries}")
+                    st.info(f"Backend still busy, retry {attempt + 1}/{max_retries}")
                     time.sleep(wait_between)
                     continue
-                else:
-                    return {"error": "Backend error is happening again and again , check logs"}
+                return {"error": "Backend error is happening again and again, check logs"}
 
             response.raise_for_status()
             return response.json()
