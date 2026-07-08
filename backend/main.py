@@ -138,8 +138,10 @@ IMG_SIZE = 224
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    image.thumbnail((512, 512))  # bade uploads ko pehle chhota karo
     image = image.resize((IMG_SIZE, IMG_SIZE))
     arr   = np.array(image, dtype=np.float32) / 255.0
+    del image
     return np.expand_dims(arr, axis=0)
 
 # =====================================================
@@ -232,13 +234,10 @@ async def predict(file: UploadFile = File(...)):
         log.info(f"Running inference: {file.filename}")
 
         # --- inference ---
-        mobilenet_pred = float(
-            mobilenet_model.predict(processed_image, verbose=0)[0][0]
-        )
+        mobilenet_pred = float(mobilenet_model(processed_image, training=False).numpy()[0][0])
         gc.collect()
-        resnet_pred = float(
-            resnet_model.predict(processed_image, verbose=0)[0][0]
-        )
+
+        resnet_pred = float(resnet_model(processed_image, training=False).numpy()[0][0])
         gc.collect()
 
         log.info(f"MobileNet: {mobilenet_pred:.3f} | ResNet: {resnet_pred:.3f}")
