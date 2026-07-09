@@ -255,8 +255,8 @@ hr {{
 # =====================================================
 # API
 # =====================================================
-API_URL   = "https://Mitali1234.hf.space/predict"
-ROOT_URL  = "https://Mitali1234.hf.space/"
+API_URL = "http://127.0.0.1:8000/predict"
+ROOT_URL = "http://127.0.0.1:8000/"
 
 # =====================================================
 # BACKGROUND WARM-UP (fire once per session, non-blocking)
