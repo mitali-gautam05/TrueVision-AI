@@ -6,22 +6,22 @@ A deep learning-based handwriting forgery detection system that classifies handw
 
 ## Overview
 
-Handwriting verification plays an important role in document authentication, forensic investigations, banking, and legal processes. TrueVision AI leverages transfer learning and ensemble learning to improve handwriting forgery detection accuracy.
+Handwriting forgery is a serious concern in document verification, forensic analysis, and signature authentication. TrueVision AI addresses this problem using computer vision and transfer learning.
 
-The application allows users to upload handwriting images through a Streamlit interface. Images are processed by a FastAPI backend, where two independently trained deep learning models generate predictions. The final decision is obtained by averaging the outputs of both models.
+Two pretrained CNN architectures — MobileNet and ResNet50 — are independently trained on handwriting samples and combined via ensemble averaging for more reliable predictions than either model alone. The system is built with a clean separation between the ML backend (FastAPI) and the user interface (Streamlit).
 
 ---
 
 ## Features
 
 - Binary handwriting classification (Real vs Forged)
-- Ensemble prediction using MobileNet and ResNet50
-- REST API powered by FastAPI
-- Interactive web interface built with Streamlit
-- Automatic Swagger API documentation
-- Background model loading for faster startup
-- Confidence score for every prediction
-- Modular project structure for easy maintenance
+- Ensemble model combining MobileNet and ResNet50 predictions
+- Tunable confidence threshold (default: 0.35)
+- REST API with auto-generated Swagger docs via FastAPI
+- Interactive image upload UI via Gradio with confidence visualizations
+- Background model loading — server binds to its port immediately so the platform's health checks pass even while models are still loading
+- Automatic retry + warm-up handling on the frontend for cold starts
+- Prediction history and a downloadable analysis report
 
 ---
 
