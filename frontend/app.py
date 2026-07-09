@@ -255,8 +255,8 @@ hr {{
 # =====================================================
 # API
 # =====================================================
-API_URL   = "https://truevision-ai-6.onrender.com/predict"
-ROOT_URL  = "https://truevision-ai-6.onrender.com/"
+API_URL   = "https://Mitali1234.hf.space/predict"
+ROOT_URL  = "https://Mitali1234.hf.space/"
 
 # =====================================================
 # BACKGROUND WARM-UP (fire once per session, non-blocking)

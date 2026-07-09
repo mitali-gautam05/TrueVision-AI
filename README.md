@@ -1,11 +1,11 @@
 # TrueVision AI
 
-> A deep learning system that classifies handwriting samples as **Real or Forged** using an ensemble of MobileNet and ResNet50 models — served via a FastAPI backend and Streamlit frontend.
+> A deep learning system that classifies handwriting samples as **Real or Forged** using an ensemble of MobileNet and ResNet50 models — served via a FastAPI backend and Gradio frontend.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://python.org)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.19-FF6F00?logo=tensorflow&logoColor=white)](https://tensorflow.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Gradio](https://img.shields.io/badge/Gradio-Frontend-F97316?logo=gradio&logoColor=white)](https://gradio.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -14,18 +14,18 @@
 
 Handwriting forgery is a serious concern in document verification, forensic analysis, and signature authentication. TrueVision AI addresses this problem using computer vision and transfer learning.
 
-Two pretrained CNN architectures — MobileNet and ResNet50 — are independently trained on handwriting samples and combined via ensemble averaging for more reliable predictions than either model alone. The system is built with a clean separation between the ML backend (FastAPI) and the user interface (Streamlit).
+Two pretrained CNN architectures — MobileNet and ResNet50 — are independently trained on handwriting samples and combined via ensemble averaging for more reliable predictions than either model alone. The system is built with a clean separation between the ML backend (FastAPI) and the user interface (Gradio).
 
 ---
 
 ## Live Demo
 
-- **Frontend (Streamlit):** deployed and publicly accessible
-- **Backend (FastAPI on Render):** `https://truevision-ai-6.onrender.com`
+- **Frontend (Gradio):** deployed on Hugging Face Spaces — `https://huggingface.co/spaces/mitali-gautam05/truevision-ai`
+- **Backend (FastAPI):** `https://truevision-ai-6.onrender.com`
   - Swagger docs: `https://truevision-ai-6.onrender.com/docs`
   - Health check: `https://truevision-ai-6.onrender.com/health`
 
-> Note: the backend runs on Render's free tier, which sleeps after periods of inactivity. The first request after idle time may take 20–60 seconds while it spins back up — this is expected, not a bug.
+> Note: the backend runs on a free tier, which sleeps after periods of inactivity. The first request after idle time may take 20–60 seconds while it spins back up — this is expected, not a bug.
 
 ---
 
@@ -35,7 +35,7 @@ Two pretrained CNN architectures — MobileNet and ResNet50 — are independentl
 - Ensemble model combining MobileNet and ResNet50 predictions
 - Tunable confidence threshold (default: 0.35)
 - REST API with auto-generated Swagger docs via FastAPI
-- Interactive image upload UI via Streamlit with confidence visualizations
+- Interactive image upload UI via Gradio with confidence visualizations
 - Background model loading — server binds to its port immediately so the platform's health checks pass even while models are still loading
 - Automatic retry + warm-up handling on the frontend for cold starts
 - Prediction history and a downloadable analysis report
@@ -45,7 +45,7 @@ Two pretrained CNN architectures — MobileNet and ResNet50 — are independentl
 ## Architecture
 
 ```
-User uploads image (Streamlit UI)
+User uploads image (Gradio UI)
           │
           ▼
   FastAPI Backend receives image
@@ -68,7 +68,7 @@ User uploads image (Streamlit UI)
                      │
                      ▼
         Confidence Score returned
-          to Streamlit frontend
+          to Gradio frontend
 ```
 
 ---
@@ -81,11 +81,11 @@ User uploads image (Streamlit UI)
 | Deep Learning | TensorFlow 2.19, Keras 3.13 |
 | Models | MobileNet, ResNet50 (pretrained, fine-tuned) |
 | Backend | FastAPI, Uvicorn |
-| Frontend | Streamlit |
+| Frontend | Gradio |
 | Image Processing | Pillow, NumPy |
 | Visualization | Matplotlib, Pandas |
 | Model Storage | Git LFS |
-| Deployment | Render (backend), Streamlit Community Cloud (frontend) |
+| Deployment | Hugging Face Spaces (frontend), Render (backend) |
 
 ---
 
@@ -101,7 +101,7 @@ project/
 │       └── resnet_model.h5
 │
 ├── frontend/
-│   ├── app.py                # Streamlit UI — upload, analysis, history, reports
+│   ├── app.py                # Gradio UI — upload, analysis, history, reports
 │   ├── requirements.txt
 │   └── assets/
 │       ├── bg.jpg
@@ -182,10 +182,10 @@ Open a new terminal:
 
 ```bash
 cd frontend
-streamlit run app.py
+python app.py
 ```
 
-UI will open at `http://localhost:8501`
+Gradio UI will open at `http://localhost:7860`
 
 > If running the frontend against the deployed backend instead of localhost, update `API_URL` in `frontend/app.py`.
 
