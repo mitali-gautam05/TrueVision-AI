@@ -8,7 +8,7 @@ A deep learning-based handwriting forgery detection system that classifies handw
 
 Handwriting forgery is a serious concern in document verification, forensic analysis, and signature authentication. TrueVision AI addresses this problem using computer vision and transfer learning.
 
-Two pretrained CNN architectures — MobileNet and ResNet50 — are independently trained on handwriting samples and combined via ensemble averaging for more reliable predictions than either model alone. The system is built with a clean separation between the ML backend (FastAPI) and the user interface (Streamlit).
+Two pretrained CNN architectures — MobileNet and ResNet50 — are independently trained on handwriting samples and combined via ensemble averaging for more reliable predictions than either model alone. The system is built with a clean separation between the ML backend (FastAPI) and user interface (Streamlit).
 
 ---
 
